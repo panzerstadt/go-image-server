@@ -23,10 +23,12 @@ func init() {
 
 func logger(handler func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
 		route := r.URL.Path
 		params := r.URL.Query()
-		fmt.Printf("%s %s %v\n", time.Now().Local().Format("2006-01-02T15:04:05"), route, params)
 		handler(w, r)
+		elapsed := time.Since(start)
+		fmt.Printf("%s %12s %s %s\n", route, elapsed, time.Now().Local().Format("2006-01-02T15:04:05"), params)
 	}
 }
 

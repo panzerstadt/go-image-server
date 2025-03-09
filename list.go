@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/djherbis/times"
 )
@@ -38,6 +39,8 @@ type Images struct {
 type Image struct {
 	Name       string `json:"name"`
 	Created_at string `json:"created_at"`
+	Width      int    `json:"width"`
+	Height     int    `json:"height"`
 }
 
 func list_images_handler(w http.ResponseWriter, r *http.Request) {
@@ -51,6 +54,9 @@ func list_images_handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var images []Image
+	ch := make(chan Image)
+	var wg sync.WaitGroup
+
 	for idx := 0; idx < len(entries); idx++ {
 		file := entries[idx]
 		filename := file.Name()
@@ -66,18 +72,46 @@ func list_images_handler(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("warning: file has no info()")
 		}
 
-		ts, err := times.Stat(image_directory + "/" + file.Name())
-		if err != nil {
-			fmt.Printf("can't call .Stat on %s: %d\n", file.Name(), err)
-		}
-
-		file_creation_ts := info.ModTime().String()
-		if ts.HasBirthTime() {
-			file_creation_ts = ts.BirthTime().String()
-		}
-
-		images = append(images, Image{Name: filename, Created_at: file_creation_ts})
+		wg.Add(1)
+		go func(filename, image_directory, modified_at string) {
+			defer wg.Done()
+			get_image_stats(ch, filename, image_directory, modified_at)
+		}(filename, image_directory, info.ModTime().String())
 	}
+
+	// Close channel when all goroutines are done
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
+	// Collect results
+	for data := range ch {
+		images = append(images, data)
+	}
+
 	res := Images{Camera: camera, Images: images}
 	json.NewEncoder(w).Encode(res)
+}
+
+func get_image_stats(ch chan<- Image, filename string, image_directory string, modified_at string) {
+	image_filepath := image_directory + "/" + filename
+	size := get_or_compute_size(image_filepath)
+
+	ts, err := times.Stat(image_filepath)
+	if err != nil {
+		fmt.Printf("can't call .Stat on %s: %d\n", filename, err)
+	}
+
+	file_creation_ts := modified_at
+	if ts.HasBirthTime() {
+		file_creation_ts = ts.BirthTime().String()
+	}
+
+	ch <- Image{
+		Name:       filename,
+		Created_at: file_creation_ts,
+		Width:      size.width,
+		Height:     size.height,
+	}
 }
