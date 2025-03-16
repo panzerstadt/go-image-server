@@ -42,7 +42,9 @@ func main() {
 	http.HandleFunc("/list", logger(list_directories_handler))
 	http.HandleFunc("/camera", logger(list_images_handler))
 	http.HandleFunc("/images", logger(serve_images))
+	http.HandleFunc("/healthcheck", logger(healthcheck))
 
 	fmt.Println("serving images at :8080")
+	monitor()
 	http.ListenAndServe(":8080", nil)
 }
