@@ -19,11 +19,13 @@ const CHECK_FREQUENCY_SECONDS = 60
 
 // check either every minute or everytime we serve images
 func monitor() {
-	for {
-		go_check()
-		proc_check()
-		time.Sleep(CHECK_FREQUENCY_SECONDS * time.Second)
-	}
+	go func() {
+		for {
+			go_check()
+			proc_check()
+			time.Sleep(CHECK_FREQUENCY_SECONDS * time.Second)
+		}
+	}()
 }
 
 func go_check() {
