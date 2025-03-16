@@ -90,7 +90,7 @@ func list_images_handler(w http.ResponseWriter, r *http.Request) {
 		images = append(images, data)
 	}
 
-	monitor()
+	monitor_once()
 	res := Images{Camera: camera, Images: images}
 	json.NewEncoder(w).Encode(res)
 }
