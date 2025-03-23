@@ -6,15 +6,33 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
+var cacheMutex sync.RWMutex
+
+func check_cache_size() {
+	f, _ := get_cache()
+	defer f.Close()
+	stat, _ := f.Stat()
+	size := stat.Size()
+	fmt.Printf("cache size: %d mb", size/1024/1024)
+}
+
 func get_cache() (*os.File, error) {
 	file, err := os.OpenFile("sizes", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		file.Close()
+		return nil, err
+	}
 	return file, err
 }
 
 func to_cache(size Size) error {
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+
 	file, err := get_cache()
 	if err != nil {
 		return err
@@ -29,10 +47,14 @@ func to_cache(size Size) error {
 	if written == 0 {
 		return fmt.Errorf("caching failed: %v", size)
 	}
+	check_cache_size()
 	return nil
 }
 
 func from_cache(key string) Size {
+	cacheMutex.RLock()
+	defer cacheMutex.RUnlock()
+
 	file, err := get_cache()
 	if err != nil {
 		fmt.Println("error loading cache")
