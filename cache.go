@@ -17,7 +17,7 @@ func check_cache_size() {
 	defer f.Close()
 	stat, _ := f.Stat()
 	size := stat.Size()
-	fmt.Printf("cache size: %d mb", size/1024/1024)
+	fmt.Printf("cache size: %.2f mb\n", float64(size)/1024/1024)
 }
 
 func get_cache() (*os.File, error) {
