@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"image/jpeg"
+	"io"
 	"net/http"
 	"os"
-	"strconv"
 )
 
 func serve_images(w http.ResponseWriter, r *http.Request) {
@@ -17,14 +17,14 @@ func serve_images(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	image_file, err := os.ReadFile(lib_directory + "/" + name)
+	image_file, err := os.Open(lib_directory + "/" + name)
 	if err != nil {
 		http.Error(w, "can't load image", http.StatusGone)
 	}
+	defer image_file.Close()
 
 	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Content-Length", strconv.Itoa(len(image_file)))
-	_, err = w.Write(image_file)
+	_, err = io.Copy(w, image_file) // stream image directly
 	if err != nil {
 		http.Error(w, "error sending file", http.StatusInternalServerError)
 	}
@@ -47,15 +47,11 @@ func get_or_compute_size(filepath string) Size {
 		fmt.Println("can't load image", http.StatusGone)
 	}
 
-	image_file_decoded, err := jpeg.Decode(bytes.NewReader(image_file))
+	img_config, err := jpeg.DecodeConfig(bytes.NewReader(image_file))
 	if err != nil {
 		fmt.Printf("image could not be decoded: %s", filepath)
 	}
-	image_size := image_file_decoded.Bounds()
-	width := image_size.Dx()
-	height := image_size.Dy()
-
-	result := Size{name: filepath, width: width, height: height}
+	result := Size{name: filepath, width: img_config.Width, height: img_config.Height}
 	to_cache(result)
 
 	return result
