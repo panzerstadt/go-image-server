@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -37,6 +38,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	http.HandleFunc("/favicon.ico", logger(handler))
 	http.HandleFunc("/", logger(list_directories_handler))
 	http.HandleFunc("/list", logger(list_directories_handler))
@@ -45,6 +49,11 @@ func main() {
 	http.HandleFunc("/healthcheck", logger(healthcheck))
 
 	fmt.Println("serving images at :8080")
-	monitor()
-	http.ListenAndServe(":8080", nil)
+	monitor(ctx)
+	err := http.ListenAndServe(":8080", nil)
+	if err != nil {
+		fmt.Println("server encountered an error and will shut down")
+		cancel()
+	}
+	fmt.Println("shutting down server.")
 }

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"runtime"
+	"sync"
 	"time"
 
 	linuxproc "github.com/c9s/goprocinfo/linux"
@@ -19,19 +21,34 @@ const CHECK_FREQUENCY_SECONDS = 60
 
 // check either every minute or everytime we serve images
 func monitor_once() {
+	var wg sync.WaitGroup
+	wg.Add(2) // We have two goroutines to wait for
+
 	go func() {
+		defer wg.Done() // Mark this goroutine as done when it returns
 		go_check()
+	}()
+
+	go func() {
+		defer wg.Done() // Mark this goroutine as done when it returns
 		proc_check()
 	}()
 
+	wg.Wait() // Wait for both goroutines to complete
 }
 
-func monitor() {
+func monitor(ctx context.Context) {
 	go func() {
 		for {
-			go_check()
-			proc_check()
-			time.Sleep(CHECK_FREQUENCY_SECONDS * time.Second)
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				go_check()
+				proc_check()
+				cache_check()
+				time.Sleep(CHECK_FREQUENCY_SECONDS * time.Second)
+			}
 		}
 	}()
 }
@@ -127,6 +144,10 @@ func proc_check() {
 	// Store current values for next iteration
 	prevCPUStats = stat
 	prevCPUStatTime = now
+}
+
+func cache_check() {
+	check_cache_size()
 }
 
 func healthcheck(w http.ResponseWriter, r *http.Request) {
